@@ -9,11 +9,11 @@ FreeBSD::Pkgs - Reads the FreeBSD installed packaged DB.
 
 =head1 VERSION
 
-Version 0.0.0
+Version 0.1.0
 
 =cut
 
-our $VERSION = '0.0.0';
+our $VERSION = '0.1.0';
 
 
 =head1 SYNOPSIS
@@ -201,19 +201,34 @@ sub new{
 This parses the '+CONTENTS' file for a package. The only required is a
 string containing the contents of the file to be parsed.
 
-    my %contents=$pkgdb->parseContents($contentString);
+=head3 args hash
+
+=head4 files
+
+A boolean controlling if file information is parsed or not.
+
+    my %contents=$pkgdb->parseContents($contentString, %args);
     if($pkgdb->{error}){
         print 'Error: '.$pkgdb->{error}."\n";
     }
-
 
 =cut
 
 sub parseContents{
 	my $self=$_[0];
 	my $contents=$_[1];
+	my %args;
+	if (defined($_[2])) {
+		%args=%{$_[2]};
+	}
+
 
 	$self->errorBlank;
+
+	#process the file info unless told to do otherwise
+	if (!defined($args{file})) {
+		$args{file}=1;
+	}
 
 	#splits the contents at every new line
 	my @contentsA=split(/\n/, $contents);
@@ -227,7 +242,7 @@ sub parseContents{
 
 	#holds the last file
 	my $file=undef;
-
+		
 	#defined if a file has a specific mode
 	my $mode=undef;
 
@@ -269,12 +284,16 @@ sub parseContents{
 
 			goto contentsParseLoopEnd;
 		}
-
+		
 		#handles ignore lines
-		if ($line =~ /^\@ignore/ ){
-			$line =~ s/^\@ignore//;
-			$ignore=1;
-
+		if ($args{file}) {
+			if ($line =~ /^\@ignore/ ){
+				$line =~ s/^\@ignore//;
+				$ignore=1;
+				
+				goto contentsParseLoopEnd;
+			}
+		}else {
 			goto contentsParseLoopEnd;
 		}
 
@@ -334,38 +353,39 @@ sub parseContents{
 			goto contentsParseLoopEnd;
 		}
 
-		#handles it group lines
-		if ($line =~ /^\@group/){
-			$line =~ s/^\@group//;
-
-			#remove any spaces at the beginning
-			$line =~ s/^\ *//;
-
-			if ($line eq "") {
-				$group=undef;
-			}else{
-				$group=$line;
+		if ($args{file}){
+			#handles it group lines
+			if ($line =~ /^\@group/){
+				$line =~ s/^\@group//;
+				
+				#remove any spaces at the beginning
+				$line =~ s/^\ *//;
+				
+				if ($line eq "") {
+					$group=undef;
+				}else{
+					$group=$line;
+				}
+				
+				goto contentsParseLoopEnd;
 			}
 
-			goto contentsParseLoopEnd;
-		}
-
-		#handles it mode lines
-		if ($line =~ /^\@mode/){
-			$line =~ s/^\@mode//;
-
-			#remove any spaces at the beginning
-			$line =~ s/^\ *//;
-
-			if ($line eq "") {
-				$mode=undef;
-			}else{
-				$mode=$line;
+			#handles it mode lines
+			if ($line =~ /^\@mode/){
+				$line =~ s/^\@mode//;
+				
+				#remove any spaces at the beginning
+				$line =~ s/^\ *//;
+				
+				if ($line eq "") {
+					$mode=undef;
+				}else{
+					$mode=$line;
+				}
+				
+				goto contentsParseLoopEnd;
 			}
-
-			goto contentsParseLoopEnd;
 		}
-
 		#handles it if metree line
 		if ($line =~ /^\@mtree /){
 			$line =~ s/^\@mtree //;
@@ -416,67 +436,75 @@ sub parseContents{
 		}
 
 		#handles it if it is a file
-		if ($line !~ /^\@/){
-			if (!defined($hash{files})){
-				$hash{files}={};
+		if ($args{file}) {
+			if ($line !~ /^\@/){
+				if (!defined($hash{files})){
+					$hash{files}={};
+				}
+				
+				$file=$line;
+				
+				$hash{files}{$line}={};
+				
+				#if a specific group is set, set it for the group
+				if (defined($group)){
+					$hash{files}{$line}{group}=$group;
+				}
+
+				#if a specific user is set, set it for the group
+				if (defined($user)){
+					$hash{files}{$line}{user}=$user;
+				}
+
+				#if a specific mode is set, set it for the file
+				if (defined($mode)){
+					$hash{files}{$line}{mode}=$mode;
+				}
+				
+				#sets the ignore flag on a file if it is defined
+				if ($ignore){
+					$hash{files}{$line}{ignore}=1;
+					$ignore=undef;
+				}
+
+				#sets the ignore_inst flag on a file if it is defined
+				if ($ignore){
+					$hash{files}{$line}{ignore_inst}=1;
+					$ignore_inst=undef;
+				}
+
+				#adds the directory for the file if it is not in the base
+				if (defined($cwd)){
+					$hash{files}{$line}{cwd}=$cwd;
+				}
+				
+				goto contentsParseLoopEnd;
 			}
-
-			$file=$line;
-
-			$hash{files}{$line}={};
-
-			#if a specific group is set, set it for the group
-			if (defined($group)){
-				$hash{files}{$line}{group}=$group;
-			}
-
-			#if a specific user is set, set it for the group
-			if (defined($user)){
-				$hash{files}{$line}{user}=$user;
-			}
-
-			#if a specific mode is set, set it for the file
-			if (defined($mode)){
-				$hash{files}{$line}{mode}=$mode;
-			}
-
-			#sets the ignore flag on a file if it is defined
-			if ($ignore){
-				$hash{files}{$line}{ignore}=1;
-				$ignore=undef;
-			}
-
-			#sets the ignore_inst flag on a file if it is defined
-			if ($ignore){
-				$hash{files}{$line}{ignore_inst}=1;
-				$ignore_inst=undef;
-			}
-
-			#adds the directory for the file if it is not in the base
-			if (defined($cwd)){
-				$hash{files}{$line}{cwd}=$cwd;
-			}
-
+		}else {
 			goto contentsParseLoopEnd;
 		}
 
 		#handles a line if it is describing a MD5 of a file
-		if ($line =~ /^\@comment MD5:/){
-			if (!defined($file)){
-				if (defined($hash{name})){
-					warn('FreeBSD-Pkgs parseContents:9: A line matching /^\@comment MD5:/'.
-						 ' was found, but no previous files were found. Line="'.
-						 $line.'" name="'.$hash{name}.'"');
-				}else {
-					warn('FreeBSD-Pkgs parseContents:9: A line matching /^\@comment MD5:/'.
-						 ' was found, but no previous files were found. Line="'.$line.'"');
+		if ($args{file}) {
+			if ($line =~ /^\@comment MD5:/){
+				if (!defined($file)){
+					if (defined($hash{name})){
+						warn('FreeBSD-Pkgs parseContents:9: A line matching /^\@comment MD5:/'.
+							 ' was found, but no previous files were found. Line="'.
+							 $line.'" name="'.$hash{name}.'"');
+					}else {
+						warn('FreeBSD-Pkgs parseContents:9: A line matching /^\@comment MD5:/'.
+							 ' was found, but no previous files were found. Line="'.$line.'"');
+					}
 				}
+
+				$line =~ s/^\@comment DEPORIGIN://;
+				
+				$hash{files}{$file}{MD5}=$line;
+				
+				goto contentsParseLoopEnd;
 			}
-
-			$line =~ s/^\@comment DEPORIGIN://;
-
-			$hash{files}{$file}{MD5}=$line;
-
+		}else {
 			goto contentsParseLoopEnd;
 		}
 
@@ -567,14 +595,22 @@ sub parseContents{
 
 This reads all installed packages. The returned value is a boolean.
 
-    $pkgdb->parseInstalled;
+=head3 args hash
+
+=head4 files
+
+A boolean controlling if file information is parsed or not.
+
+This will be passed to parseInstalledPkg and then parseContents.
+
+    $pkgdb->parseInstalled(%args);
     #checks to see if it completed successfully
     if($pkgdb->{error}){
         print 'Error: '.$pkgdb->{error}."\n";
     }
 
     #checks to make sure it completed successfully using a if statement
-    if($pkgdb->parseInstalled){
+    if($pkgdb->parseInstalled(%args)){
         print 'Error: '.$pkgdb->{error}."\n";
     }
 
@@ -582,6 +618,10 @@ This reads all installed packages. The returned value is a boolean.
 
 sub parseInstalled{
 	my $self=$_[0];
+	my %args;
+	if (defined($_[1])) {
+		%args=%{$_[1]};
+	}
 
 	#makes sure it exists
 	if (! -e $self->{pkgdb}){
@@ -606,7 +646,7 @@ sub parseInstalled{
 	while (defined($packages[$packagesInt])){
 		#only process it if it is a directory
 		if (-d $self->{pkgdb}.'/'.$packages[$packagesInt]){
-			my %returned=$self->parseInstalledPkg($packages[$packagesInt]);
+			my %returned=$self->parseInstalledPkg($packages[$packagesInt], \%args);
 			#only add it if it is not an error
 			if (!defined($self->{error})) {
 				$self->{packages}{$packages[$packagesInt]}={%returned};
@@ -629,11 +669,28 @@ sub parseInstalled{
 
 This parses the specified installed package.
 
+=head3 args hash
+
+=head4 files
+
+A boolean controlling if file information is parsed or not.
+
+This will be passed to parseContents.
+
+    my %pkg=$pkgdb->parseInstalledPkg($pkgname, %args);
+    if($error){
+        print "Error!\n";
+    }
+
 =cut
 
 sub parseInstalledPkg{
 	my $self=$_[0];
 	my $pkg=$_[1];
+	my %args;
+	if (defined($_[2])) {
+		%args=%{$_[2]};
+	}
 
 	$self->errorBlank;
 
@@ -712,7 +769,7 @@ sub parseInstalledPkg{
 
 	#we don't do any error checking here as if there is a error, it will
 	#already by defined
-	$hash{contents}={$self->parseContents($contentsString)};
+	$hash{contents}={$self->parseContents($contentsString,\%args)};
 
 	return %hash;
 }

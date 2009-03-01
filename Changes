@@ -1,5 +1,4 @@
 Revision history for FreeBSD-Pkgs
 
-0.01    Date/time
-        First version, released on an unsuspecting world.
-
+0.1.0	2009-03-01/13:00
+		-Make processing file related things for the pakages optional.
