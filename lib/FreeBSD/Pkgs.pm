@@ -9,11 +9,11 @@ FreeBSD::Pkgs - Reads the FreeBSD installed packaged DB.
 
 =head1 VERSION
 
-Version 0.1.0
+Version 0.1.1
 
 =cut
 
-our $VERSION = '0.1.0';
+our $VERSION = '0.1.1';
 
 
 =head1 SYNOPSIS
@@ -98,7 +98,7 @@ The following example prints out the package information.
     	}
     
     	#print dirrm stuff
-    	my dirrmInt=0;
+    	my $dirrmInt=0;
     	while (defined($pkg->{contents}{dirrm}[$dirrmInt])){
     		print $name." conflicts with ".$pkg->{contents}{dirrm}[$dirrmInt]."\n";
     		$dirrmInt++;
@@ -543,6 +543,19 @@ sub parseContents{
 			}
 			
 			push(@{$hash{dirrm}}, $line);
+			
+			goto contentsParseLoopEnd;
+		}
+
+		#handles display lines
+		if ($line =~ /^\@display /){
+			$line =~ s/^\@display //;
+
+			if (!defined($hash{display})) {
+				$hash{display}=[];
+			}
+			
+			push(@{$hash{display}}, $line);
 			
 			goto contentsParseLoopEnd;
 		}
