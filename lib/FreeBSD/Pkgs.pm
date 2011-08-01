@@ -9,11 +9,11 @@ FreeBSD::Pkgs - Reads the FreeBSD installed packaged DB.
 
 =head1 VERSION
 
-Version 0.1.1
+Version 0.1.2
 
 =cut
 
-our $VERSION = '0.1.1';
+our $VERSION = '0.1.2';
 
 
 =head1 SYNOPSIS
@@ -669,7 +669,10 @@ sub parseInstalled{
 			}
 		}else{
 			#non-fatal
-			warn('FreeBSD-Pkgs:3: Skipping "'.$packages[$packagesInt].'" as it is not a directory');
+			#exception for the portupgrade DB file
+			if ($packages[$packagesInt] ne 'pkgdb.db') {
+				warn('FreeBSD-Pkgs:3: Skipping "'.$packages[$packagesInt].'" as it is not a directory');
+			}
 		}
 
 		$packagesInt++;
@@ -1010,7 +1013,7 @@ Unable to make sense of the specified '+CONTENTS' line.
 
 =head1 AUTHOR
 
-Zane C. Bowers, C<< <vvelox at vvelox.net> >>
+Zane C. Bowers-Hadley, C<< <vvelox at vvelox.net> >>
 
 =head1 BUGS
 
@@ -1053,10 +1056,11 @@ L<http://search.cpan.org/dist/FreeBSD-Pkgs>
 
 =head1 ACKNOWLEDGEMENTS
 
+Peter V. Vereshagin, #69658, notified me about a pointless warning for the portupgrade DB file
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Zane C. Bowers, all rights reserved.
+Copyright 2011 Zane C. Bowers-Hadley, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

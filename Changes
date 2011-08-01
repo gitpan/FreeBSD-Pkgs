@@ -1,5 +1,9 @@
 Revision history for FreeBSD-Pkgs
 
+0.1.2	2011-07-01/04:30
+		-Don't warn about portupgrade's DB file.
+		-Update name post marriage.
+
 0.1.1	2009-03-25/13:00
 		-Now handles display lines.
 

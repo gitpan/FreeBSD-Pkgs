@@ -4,7 +4,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
     NAME                => 'FreeBSD::Pkgs',
-    AUTHOR              => 'Zane C. Bowers <vvelox@vvelox.net>',
+    AUTHOR              => 'Zane C. Bowers-Hadley <vvelox@vvelox.net>',
     VERSION_FROM        => 'lib/FreeBSD/Pkgs.pm',
     ABSTRACT_FROM       => 'lib/FreeBSD/Pkgs.pm',
     PL_FILES            => {},
