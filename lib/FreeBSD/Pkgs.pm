@@ -2,6 +2,7 @@ package FreeBSD::Pkgs;
 
 use warnings;
 use strict;
+use base 'Error::Helper';
 
 =head1 NAME
 
@@ -9,11 +10,11 @@ FreeBSD::Pkgs - Reads the FreeBSD installed packaged DB.
 
 =head1 VERSION
 
-Version 0.1.2
+Version 0.2.0
 
 =cut
 
-our $VERSION = '0.1.2';
+our $VERSION = '0.2.0';
 
 
 =head1 SYNOPSIS
@@ -118,8 +119,8 @@ The following example prints out the package information.
     my $pkgdb=FreeBSD::Pkgs->new({pkgdb=>'/var/db/pkg'});
 
     #if this is true there is a error
-    if($pkgdb->{error}){
-        print 'Error: '.$pkgdb->{error}."\n";
+    if($pkgdb->error){
+        warn('Error:'.$pkgdb->error.': '.$pkgdb->errorString);
     }
 
 =head3 arguement keys
@@ -143,7 +144,11 @@ sub new{
 	}
 
 	#blesses it and inits the hash
-	my $self={packages=>{}, error=>undef};
+	my $self={
+		packages=>{}, 
+		error=>undef,
+		errorString=>'',
+	};
 	bless $self;
 
 	#figures out what to use for pkgdb
@@ -208,8 +213,8 @@ string containing the contents of the file to be parsed.
 A boolean controlling if file information is parsed or not.
 
     my %contents=$pkgdb->parseContents($contentString, %args);
-    if($pkgdb->{error}){
-        print 'Error: '.$pkgdb->{error}."\n";
+    if($pkgdb->error){
+        warn('Error:'.$pkgdb->error.': '.$pkgdb->errorString);
     }
 
 =cut
@@ -222,8 +227,9 @@ sub parseContents{
 		%args=%{$_[2]};
 	}
 
-
-	$self->errorBlank;
+	if ( ! $self->errorblank ){
+		return undef;
+	}
 
 	#process the file info unless told to do otherwise
 	if (!defined($args{file})) {
@@ -418,11 +424,11 @@ sub parseContents{
 		if ($line =~ /^\@comment DEPORIGIN:/){
 			if (!defined($pkgdep)){
 				if (defined($hash{name})){
-					warn('FreeBSD-Pkgs parseContents:8: A line matching /^\@comment DEPORIGIN:/'.
+					$self->warnString('A line matching /^\@comment DEPORIGIN:/'.
 						 ' was found, but no previous package dependencies were found. Line="'.
 						 $line.'" name="'.$hash{name}.'"');
 				}else {
-					warn('FreeBSD-Pkgs parseContents:8: A line matching /^\@comment DEPORIGIN:/'.
+					$self->warnString('A line matching /^\@comment DEPORIGIN:/'.
 						 ' was found, but no previous package dependencies were found. Line="'.
 						 $line.'"');
 				}
@@ -489,11 +495,11 @@ sub parseContents{
 			if ($line =~ /^\@comment MD5:/){
 				if (!defined($file)){
 					if (defined($hash{name})){
-						warn('FreeBSD-Pkgs parseContents:9: A line matching /^\@comment MD5:/'.
+						$self->warnString('A line matching /^\@comment MD5:/'.
 							 ' was found, but no previous files were found. Line="'.
 							 $line.'" name="'.$hash{name}.'"');
 					}else {
-						warn('FreeBSD-Pkgs parseContents:9: A line matching /^\@comment MD5:/'.
+						$self->warnString('A line matching /^\@comment MD5:/'.
 							 ' was found, but no previous files were found. Line="'.$line.'"');
 					}
 				}
@@ -636,16 +642,23 @@ sub parseInstalled{
 		%args=%{$_[1]};
 	}
 
+	if ( ! $self->errorblank ){
+		return undef;
+	}
+
 	#makes sure it exists
 	if (! -e $self->{pkgdb}){
-		warn("FreeBSD-Pkgs:1: PKG_DBDIR, '".$self->{pkgdb}."' does not exist");
+		$self->{errorString}="PKG_DBDIR, '".$self->{pkgdb}."' does not exist";
 		$self->{error}='1';
+		$self->warn;
 		return undef;
 	}
 
 	#reads the packages
 	if (!opendir(PKGDBDIR, $self->{pkgdb})){
-		warn("FreeBSD-Pkgs:2: Could not open PKG_DBDIR, '".$self->{pkgdb}."',");
+		$self->{errorString}="Could not open PKG_DBDIR, '".$self->{pkgdb}."',";
+		$self->{error}=2;
+		$self->warn;
 		return undef;
 	}
 	my @packages=readdir(PKGDBDIR);
@@ -665,13 +678,13 @@ sub parseInstalled{
 				$self->{packages}{$packages[$packagesInt]}={%returned};
 
 			}else{
-				warn('FreeBSD-Pkgs:3: Parsing "'.$packages[$packagesInt].'" as failed.');
+				$self->warnString('Parsing "'.$packages[$packagesInt].'" as failed.');
 			}
 		}else{
 			#non-fatal
 			#exception for the portupgrade DB file
 			if ($packages[$packagesInt] ne 'pkgdb.db') {
-				warn('FreeBSD-Pkgs:3: Skipping "'.$packages[$packagesInt].'" as it is not a directory');
+				$self->warnString('Skipping "'.$packages[$packagesInt].'" as it is not a directory');
 			}
 		}
 
@@ -708,7 +721,9 @@ sub parseInstalledPkg{
 		%args=%{$_[2]};
 	}
 
-	$self->errorBlank;
+	if (! $self->errorblank ){
+		return undef;
+	}
 
 	#this is the directory that holds the package information
 	my $pkgdir=$self->{pkgdb}."/".$pkg;
@@ -726,7 +741,8 @@ sub parseInstalledPkg{
 		
 		if (!open(REQUIREDBY, $requiredby)){
 			$self->{error}='4';
-			warn('FreeBSD-Pkgs:4: Could not open the required by file, "'.$requiredby.'",');
+			$self->{errorString}='Could not open the required by file, "'.$requiredby.'",';
+			$self->warn;
 			return undef;
 		}
 		my @reqs=<REQUIREDBY>;
@@ -789,21 +805,6 @@ sub parseInstalledPkg{
 
 	return %hash;
 }
-
-=head2 errorBlank
-
-This is a internal function and should not be called.
-
-=cut
-
-#blanks the error flags
-sub errorBlank{
-        my $self=$_[0];
-
-        $self->{error}=undef;
-
-        return 1;
-};
 
 =head1 Package Hash
 
@@ -963,7 +964,9 @@ It is generally uses atleast twice the amount of ram as the size of the pkgdb.
 
 =back
 
-=head1 ERROR CODES
+=head1 ERROR CODES/HANDLING
+
+Error handling is provided by L<Error::Helper>.
 
 =head2 1
 
@@ -1060,7 +1063,7 @@ Peter V. Vereshagin, #69658, notified me about a pointless warning for the portu
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2011 Zane C. Bowers-Hadley, all rights reserved.
+Copyright 2012 Zane C. Bowers-Hadley, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
